@@ -47,7 +47,6 @@ def analizar_trafico(tiempo=10):
 
     df = pd.DataFrame(trafico)
 
-    # 🔥 SI NO HAY DATOS, CREA DATOS DE PRUEBA
     if df.empty:
         print("No se capturó tráfico, usando datos de prueba...")
         df = pd.DataFrame([
@@ -66,7 +65,6 @@ def entrenar_modelo(df):
     if df.empty:
         return None, None, None
 
-    # Regla simple: paquetes grandes = anómalos
     df["etiqueta"] = df["longitud"].apply(lambda x: 1 if x > 1000 else 0)
 
     X = df[["longitud", "protocolo"]]
