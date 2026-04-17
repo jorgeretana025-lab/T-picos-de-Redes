@@ -1,4 +1,4 @@
-#Practica 2 Desteccion de Localhost
+# Practica 2 Deteccion de Localhost
 
 from scapy.all import ARP, Ether, srp, sniff
 import pandas as pd
@@ -7,42 +7,57 @@ from sklearn.ensemble import RandomForestClassifier
 """
 Escaneo de Red
 """
-
 def escanear_red(ip_range="192.168.1.1/24"):
     print("Escaneando dispositivos...")
 
     arp = ARP(pdst=ip_range)
     ether = Ether(dst="ff:ff:ff:ff:ff:ff")
-    paquete = ether /arp 
+    paquete = ether / arp 
 
-    resultado = srp(paquete, timeout=2, verbose=0) [0]
+    resultado = srp(paquete, timeout=2, verbose=0)[0]
 
     dispositivos = []
-    for enviado, recibido, in resultado:
+    for enviado, recibido in resultado:
         dispositivos.append({
             "ip": recibido.psrc,
             "mac": recibido.hwsrc
         })
     return dispositivos
 
+
 """
 Capturar Trafico
 """
-
 trafico = []
 
 def capturar_paquetes(packet):
-    if packet.haslayer("Ip"):
+    if packet.haslayer("IP"):
         trafico.append({
-            "ip": packet["IP"].scr,
+            "ip": packet["IP"].src,
             "longitud": len(packet),
             "protocolo": packet["IP"].proto
         })
 
 def analizar_trafico(tiempo=10):
+    global trafico
+    trafico = []
+
     print("Capturando Trafico...")
     sniff(prn=capturar_paquetes, timeout=tiempo)
-    return pd.DataFrame(trafico)
+
+    df = pd.DataFrame(trafico)
+
+    # 🔥 SI NO HAY DATOS, CREA DATOS DE PRUEBA
+    if df.empty:
+        print("No se capturó tráfico, usando datos de prueba...")
+        df = pd.DataFrame([
+            {"ip": "192.168.1.10", "longitud": 200, "protocolo": 6},
+            {"ip": "192.168.1.15", "longitud": 1500, "protocolo": 6},
+            {"ip": "192.168.1.20", "longitud": 300, "protocolo": 17},
+        ])
+
+    return df
+
 
 """
 IA
@@ -51,6 +66,7 @@ def entrenar_modelo(df):
     if df.empty:
         return None, None, None
 
+    # Regla simple: paquetes grandes = anómalos
     df["etiqueta"] = df["longitud"].apply(lambda x: 1 if x > 1000 else 0)
 
     X = df[["longitud", "protocolo"]]
@@ -73,6 +89,7 @@ Main
 """
 if __name__ == "__main__":
 
+
     dispositivos = escanear_red()
     print("\nDispositivos encontrados:")
     for d in dispositivos:
@@ -80,7 +97,7 @@ if __name__ == "__main__":
 
     df = analizar_trafico(10)
     print("\nDatos capturados:")
-    print(df.head())
+    print(df)
 
     modelo, X, y = entrenar_modelo(df)
 
@@ -88,11 +105,10 @@ if __name__ == "__main__":
         predicciones = predecir_trafico(modelo, X)
         df["prediccion"] = predicciones
 
-        print("\nResultados:")
-        print(df.head())
+        df["estado"] = df["prediccion"].apply(lambda x: "Anómalo" if x == 1 else "Normal")
 
-        print("\nAnomalias detectadas:")
-        print(df[df["prediccion"] == 1])
+        print("\nClasificación por IP:")
+        print(df[["ip", "estado"]].drop_duplicates())
+
     else:
         print("No hay datos para entrenar el modelo.")
-         
